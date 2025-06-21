@@ -1,0 +1,146 @@
+---
+title: "Gestión de Estado con Provider (Flutter)"
+description: "Directrices para la gestión de estado en aplicaciones Flutter utilizando el patrón Provider, detallando tipos, flujo de datos y buenas prácticas para la cohesión y responsabilidad única."
+patterns:
+  - "**/*.dart"
+---
+
+# Gestión de Estado con Provider (Flutter)
+
+## Contexto
+La aplicación móvil `factura-movil` utiliza el paquete `provider` como su solución principal para la gestión del estado. Esta regla establece las convenciones y mejores prácticas para el uso efectivo de `Provider` en la aplicación, asegurando un manejo de estado modular, eficiente y mantenible.
+
+## Core Guidelines
+
+### 1. Clases de Proveedor
+- Las clases de proveedor deben extender `ChangeNotifier` y ubicarse en el directorio `lib/providers` (e.g., `auth_provider.dart`, `factura_provider.dart`).
+- Deben encapsular la lógica de negocio y el estado relacionado con una funcionalidad específica.
+- Después de cualquier cambio en el estado que deba reflejarse en la UI, se debe llamar a `notifyListeners()`.
+
+### 2. Tipos de Provider y Casos de Uso
+- **`ChangeNotifierProvider`**: El tipo más común, utilizado para exponer un `ChangeNotifier` a un subárbol de widgets. Ideal para estados que cambian con frecuencia.
+- **`Provider` (sin ChangeNotifier)**: Para exponer cualquier tipo de objeto que no necesita notificar a sus oyentes cuando cambia. Útil para valores inmutables o dependencias inyectadas (e.g., instancias de servicios).
+- **`FutureProvider`**: Útil para cuando un valor se carga asíncronamente una sola vez (e.g., fetching inicial de datos).
+- **`StreamProvider`**: Para exponer un flujo de datos (Stream) que los widgets pueden escuchar. Ideal para datos en tiempo real o actualizaciones continuas.
+- **`ProxyProvider`**: Permite crear un proveedor que depende de otros proveedores en el árbol. Muy útil para inyectar dependencias con lógica interdependiente.
+
+### 3. Consumo de Proveedores
+- **Lectura de Estado con reconstrucción**: Utilizar `Provider.of<T>(context)` o `context.watch<T>()` dentro del método `build` de un widget para escuchar cambios en el estado y reconstruir el widget.
+- **Lectura sin escuchar**: Cuando solo se necesita acceder al estado o llamar a un método del proveedor sin reconstruir el widget, usar `context.read<T>()`.
+- **Inyección**: Utilizar `ChangeNotifierProvider` (o `MultiProvider` para múltiples proveedores) para inyectar los proveedores en el árbol de widgets.
+
+### 4. Flujo de Datos Canónico
+El flujo de interacción y actualización de datos debe seguir el siguiente patrón:
+- **Interacción del Usuario en `Widget`**: Un widget (e.g., botón) captura una interacción del usuario.
+- **Llama a método en `Provider`**: El widget llama a un método expuesto por un `Provider` (usando `context.read<ProviderType>().method()`).
+- **`Provider` usa un `Service`**: El `Provider` contiene la lógica de negocio y, si es necesario interactuar con APIs o persistencia, delega estas operaciones a un `Service` (`lib/services`).
+- **`Service` retorna datos**: El `Service` realiza la operación (e.g., llamada HTTP) y retorna los datos al `Provider`.
+- **`Provider` actualiza estado y notifica `listeners`**: El `Provider` procesa los datos, actualiza su estado interno y llama a `notifyListeners()` para que los widgets dependientes se reconstruyan.
+
+### 5. Cohesión y Responsabilidad Única en Providers
+- **Evitar clases monolíticas**: Los `Providers` deben tener una única responsabilidad o un conjunto muy cohesionado de responsabilidades. Evitar crear `Providers` "god object" que gestionen demasiadas funcionalidades dispares.
+- **Delegación a Servicios**: La lógica compleja de comunicación con el backend o la base de datos debe residir en `lib/services`, no directamente en los `Providers`.
+- **Granularidad**: Considerar crear múltiples `Providers` pequeños y especializados en lugar de uno grande, utilizando `MultiProvider` o anidando `Providers` cuando sea necesario para inentar el estado.
+
+## Code Examples
+
+```dart
+// Good: Definición de un proveedor (lib/providers/example_provider.dart)
+import 'package:flutter/foundation.dart';
+import '../services/data_service.dart'; // Asume que existe DataService
+
+class ExampleProvider with ChangeNotifier {
+  final DataService _dataService;
+  String _data = 'Initial Data';
+
+  // Inyección del servicio
+  ExampleProvider(this._dataService);
+
+  String get data => _data;
+
+  Future<void> fetchData() async {
+    // Lógica de negocio orquestando el servicio
+    final fetched = await _dataService.fetchSomeData();
+    _data = fetched;
+    notifyListeners();
+  }
+
+  void updateData(String newData) {
+    _data = newData;
+    notifyListeners(); // Notifica a los widgets que escuchan el cambio
+  }
+}
+
+// Good: Consumo de un proveedor en un widget (lib/screens/example_screen.dart)
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/example_provider.dart';
+
+class ExampleScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    // Escucha cambios en ExampleProvider
+    final exampleProvider = context.watch<ExampleProvider>();
+
+    return Scaffold(
+      appBar: AppBar(title: Text('Provider Example')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Current Data: ${exampleProvider.data}'),
+            ElevatedButton(
+              onPressed: () {
+                // Actualiza los datos a través del proveedor
+                context.read<ExampleProvider>().updateData('New Data from Button');
+              },
+              child: Text('Update Data'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // Llama al método que usa el servicio
+                context.read<ExampleProvider>().fetchData();
+              },
+              child: Text('Fetch Data from Service'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Good: Inyección del proveedor en main.dart o en un nivel superior del árbol de widgets
+// Asume que DataService se inyecta o se inicializa de alguna forma
+// void main() {
+//   runApp(
+//     MultiProvider(
+//       providers: [
+//         Provider(create: (_) => DataService()), // Inyecta el servicio
+//         ChangeNotifierProvider(
+//           create: (context) => ExampleProvider(context.read<DataService>()),
+//         ),
+//         // ... otros proveedores
+//       ],
+//       child: MyApp(),
+//     ),
+//   );
+// }
+
+// Good: Ejemplo de FutureProvider para una carga única
+// final userFutureProvider = FutureProvider<UserModel>((ref) async {
+//   final userService = ref.watch(userServiceProvider);
+//   return userService.fetchCurrentUser();
+// });
+```
+
+## Avoid
+- Llamar a `notifyListeners()` en cada línea de código si no es necesario.
+- Realizar operaciones de red o persistencia directamente en los widgets; siempre delegar a los servicios (`lib/services`).
+- Usar `Provider.of<T>(context, listen: false)` cuando el widget sí necesita reconstruirse con los cambios de estado.
+- Crear lógica compleja dentro de los widgets en lugar de en los proveedores.
+- **Providers monolíticos**: Evitar `Providers` que gestionen demasiadas responsabilidades dispares, haciendo que sean difíciles de mantener y escalar.
+- **Lógica de negocio en Widgets**: La lógica de negocio compleja debe residir en los `Providers`, no directamente en los `Widgets`.
+
+## Integration Notes
+Esta regla asegura un manejo de estado consistente y eficiente en la aplicación Flutter, mejorando la mantenibilidad y la escalabilidad de la UI. Se complementa con `201-arquitectura-frontend-flutter.mdc` para la estructura general y `210-comunicacion-backend-http.mdc` para la interacción con el backend a través de servicios.

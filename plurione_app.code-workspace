@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "plurione_app",
+			"path": "."
+		},
+		{
+			"name": "raise-ai",
+			"path": "../../Code/raise-ai"
+		}
+	],
+	"settings": {}
+}

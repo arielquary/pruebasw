@@ -1,0 +1,87 @@
+---
+title: "Gestión de Configuración Externa"
+description: "Establece las mejores prácticas para externalizar parámetros de configuración en archivos externos (YAML, JSON, .env) en lugar de hardcodearlos, mejorando mantenibilidad, flexibilidad y seguridad."
+patterns:
+  - "**/*.yml"
+  - "**/*.yaml"
+  - "**/*.properties"
+  - "**/*.json"
+  - "**/*.env"
+  - "**/*.java"
+---
+
+# Gestión de Configuración Externa
+
+## Contexto
+La configuración de las aplicaciones Spring Boot en `factura-movil` se maneja a través de archivos externos y mecanismos de inyección de configuración para distintos entornos. Esta regla establece las directrices para asegurar una gestión segura, flexible y mantenible de la configuración.
+
+## Core Guidelines
+
+### 1. Archivos de Configuración Estándar
+- Utilizar `application.yml` o `application.properties` para la configuración general de la aplicación. Estos archivos deben ubicarse en `src/main/resources` de cada microservicio.
+- Permiten cambiar la configuración sin modificar el código fuente, facilitando la adaptación a diferentes entornos.
+
+### 2. Directorios de Configuración Adicionales
+- La existencia de directorios como `944-CatalogosFacMovil/archivos_de_configuracion` y `944-Factura_Movil_Backend/archivos_de_configuracion` sugiere la organización de archivos de configuración adicionales o específicos de un entorno.
+- Utilizar estos directorios para configuraciones que no son parte del `src/main/resources` estándar, como certificados, claves públicas, etc.
+
+### 3. Manejo de Información Sensible
+- **Prohibido el Hardcoding**: Las credenciales sensibles (claves de API, contraseñas de bases de datos, secretos de JWT, certificados privados) **NO** deben ser hardcodeadas en el código fuente ni en los archivos de configuración versionados (`.yml`, `.properties`).
+- **Variables de Entorno**: Preferir el uso de variables de entorno para inyectar configuraciones sensibles a nivel de sistema operativo del contenedor. Esto es fundamental para entornos de despliegue como Kubernetes/OpenShift.
+- **Sistemas de Gestión de Secretos**: Para entornos de producción, utilizar las capacidades de los orquestadores de contenedores (e.g., Kubernetes `Secrets`, OpenShift `Secrets`) para inyectar credenciales de forma segura en los contenedores de las aplicaciones. Alternativamente, considerar el uso de un gestor de secretos dedicado (e.g., HashiCorp Vault).
+
+### 4. Configuración por Ambiente
+- Utilizar los perfiles de Spring Boot (`spring.profiles.active`) o los mecanismos de configuración de Kubernetes/OpenShift para aplicar configuraciones específicas de cada ambiente (desarrollo, QA, producción).
+- Esto se logra mediante archivos como `application-dev.yml`, `application-prod.yml`, o ConfigMaps específicos de ambiente.
+
+## Code Examples
+
+```yaml
+# Good: application.yml (src/main/resources/application.yml)
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+my-app:
+  jwt-secret: ${JWT_SECRET} # Valor sensible desde variable de entorno o Secret
+  api-key: ${EXTERNAL_API_KEY}
+  default-page-size: 10
+```
+
+```java
+// Good: Acceso a configuración en Spring Boot
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MyConfigService {
+
+    @Value("${my-app.jwt-secret}")
+    private String jwtSecret;
+
+    @Value("${my-app.default-page-size}")
+    private int defaultPageSize;
+
+    public String getJwtSecret() {
+        return jwtSecret;
+    }
+
+    public int getDefaultPageSize() {
+        return defaultPageSize;
+    }
+}
+```
+
+## Avoid
+- Hardcodear cualquier tipo de credencial o secreto en el código fuente o en archivos de configuración versionados.
+- Duplicar la configuración entre diferentes archivos si se puede gestionar con perfiles de Spring Boot o ConfigMaps.
+- No documentar qué configuraciones son sensibles y cómo deben ser gestionadas.
+- Utilizar el mismo archivo de configuración sin sobrescrituras para diferentes entornos de despliegue.
+
+## Integration Notes
+Esta regla es crucial para la seguridad operativa y la flexibilidad del despliegue en `factura-movil`. Se integra directamente con `501-despliegue-docker.mdc` y `502-orquestacion-kubernetes.mdc`, ya que la contenerización y orquestación son los principales mecanismos para inyectar esta configuración externa y segura.

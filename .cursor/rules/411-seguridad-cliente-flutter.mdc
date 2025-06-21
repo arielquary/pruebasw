@@ -1,0 +1,83 @@
+---
+title: "Seguridad Cliente (Flutter)"
+description: "Establecer guías de seguridad en el lado del cliente, obligando el uso de flutter_secure_storage para datos sensibles y guiando sobre la implementación de autenticación biométrica con local_auth."
+patterns:
+  - "**/*.dart"
+---
+
+# Seguridad Cliente (Flutter)
+
+## Contexto
+La seguridad en el lado del cliente es un componente crítico de la aplicación móvil `factura-movil`, especialmente en lo que respecta al almacenamiento de datos sensibles como los JWT y la gestión de la autenticación. Esta regla establece las mejores prácticas para asegurar la integridad y confidencialidad de la información del usuario en el frontend de Flutter.
+
+## Core Guidelines
+
+### 1. Almacenamiento Seguro de Datos Sensibles (JWT)
+- **Obligatorio el uso de `flutter_secure_storage`**: Cualquier dato sensible, especialmente los JSON Web Tokens (JWT) recibidos del backend, **DEBE** ser almacenado utilizando el paquete `flutter_secure_storage`.
+- **Propósito**: Esta librería utiliza keychains/keystores específicos de la plataforma (iOS Keychain, Android Keystore) para cifrar y proteger los datos, impidiendo el acceso no autorizado incluso si el dispositivo es comprometido.
+- **No `SharedPreferences`**: **Nunca** se deben almacenar JWTs u otra información sensible en `SharedPreferences` u otros almacenes no cifrados, ya que no son seguros contra ataques de acceso al sistema de archivos.
+
+### 2. Implementación de Autenticación Biométrica
+- **Uso de `local_auth`**: Para la implementación de funcionalidades de autenticación biométrica (huella dactilar, reconocimiento facial), se debe utilizar el paquete `local_auth`.
+- **Integración**: La lógica de autenticación biométrica debe integrarse de manera que, tras una autenticación exitosa, se pueda acceder a recursos protegidos o se refuerce la seguridad del token almacenado.
+- **Consideraciones de fallback**: Siempre proporcionar opciones de fallback (ej., PIN o contraseña) si la autenticación biométrica no está disponible o falla.
+
+### 3. Cifrado en Tránsito
+- Todas las comunicaciones con el backend deben realizarse exclusivamente a través de **HTTPS**. El API Gateway (`944-ZuulFacMovil`) asegura esto en el lado del servidor, y el cliente debe siempre utilizar URLs `https://`.
+- Esto garantiza que los datos (incluidos los JWTs) estén cifrados mientras se transmiten por la red.
+
+## Code Examples
+
+```dart
+// Good: Almacenamiento seguro del JWT
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+class SecureStorageService {
+  final _storage = const FlutterSecureStorage();
+
+  Future<void> saveJwt(String token) async {
+    await _storage.write(key: 'jwt_token', value: token);
+  }
+
+  Future<String?> readJwt() async {
+    return await _storage.read(key: 'jwt_token');
+  }
+
+  Future<void> deleteJwt() async {
+    await _storage.delete(key: 'jwt_token');
+  }
+}
+
+// Good: Uso de autenticación biométrica
+import 'package:local_auth/local_auth.dart';
+
+class BiometricAuthService {
+  final LocalAuthentication auth = LocalAuthentication();
+
+  Future<bool> authenticateWithBiometrics() async {
+    bool canCheckBiometrics = await auth.canCheckBiometrics;
+    if (canCheckBiometrics) {
+      List<BiometricType> availableBiometrics = await auth.getAvailableBiometrics();
+      if (availableBiometrics.isNotEmpty) {
+        return await auth.authenticate(
+          localizedReason: 'Por favor, autentíquese para acceder a la aplicación',
+          options: const AuthenticationOptions(
+            stickyAuth: true,
+            biometricOnly: true,
+          ),
+        );
+      }
+    }
+    return false; // Biometría no disponible o no configurada
+  }
+}
+```
+
+## Avoid
+- Almacenar JWTs o cualquier otra información sensible en `SharedPreferences` o variables globales no protegidas.
+- Hardcodear claves de cifrado o secretos en el código fuente.
+- Realizar solicitudes HTTP sin cifrado (utilizando `http://` en lugar de `https://`).
+- Implementar lógica de autenticación biométrica personalizada sin utilizar librerías probadas como `local_auth`.
+
+## Integration Notes
+Esta regla es fundamental para la seguridad general de la aplicación móvil y se integra con la capa de servicios HTTP (`230-capa-servicios-http.mdc`) que consume el JWT almacenado de forma segura, y con la gestión de autenticación a nivel de `Providers` (`205-gestion-estado-provider.mdc`).

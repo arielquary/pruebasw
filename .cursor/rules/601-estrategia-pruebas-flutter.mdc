@@ -1,0 +1,144 @@
+---
+title: "Estrategia de Pruebas (Flutter)"
+description: "Fomenta una cultura de calidad y testing, describiendo la pirámide de pruebas del proyecto y dando guías para escribir pruebas unitarias, de widgets y de integración en Flutter."
+patterns:
+  - "**/*.dart"
+---
+
+# Estrategia de Pruebas (Flutter)
+
+## Contexto
+La calidad del software es fundamental en el proyecto `factura-movil`. Esta regla establece una estrategia de pruebas clara para el frontend de Flutter, promoviendo el uso de diferentes tipos de pruebas para asegurar la funcionalidad, estabilidad y mantenibilidad de la aplicación.
+
+## Core Guidelines
+
+### 1. Pirámide de Pruebas
+La aplicación Flutter debe adherirse a la pirámide de pruebas estándar, priorizando:
+- **Pruebas Unitarias (Base)**: La mayor cantidad de pruebas, enfocadas en funciones y clases aisladas (`providers`, `services`, modelos). Rápidas de ejecutar.
+- **Pruebas de Widgets (Medio)**: Verifican el comportamiento y la apariencia de los widgets de UI de forma aislada o en conjunto.
+- **Pruebas de Integración (Cima)**: Menor cantidad, pero cubren flujos de usuario completos, interactuando con múltiples componentes y posiblemente con un backend simulado. Más lentas.
+
+### 2. Pruebas Unitarias
+- **Alcance**: Probar unidades de código pequeñas y aisladas, como clases de `Providers`, `Services`, `models`, `enums` y `helpers`.
+- **Ubicación**: Los archivos de prueba unitaria deben ubicarse en el directorio `test/unit` y seguir la convención `nombre_de_archivo_test.dart`.
+- **Framework**: Utilizar `package:test/test.dart` y `package:flutter_test/flutter_test`.
+- **Mocking**: Emplear `package:mockito/mockito.dart` para crear mocks de dependencias externas (ej., `HttpClient`, `SecureStorageService`) y aislar la unidad bajo prueba.
+- **Cobertura**: Apuntar a una alta cobertura de pruebas unitarias para la lógica de negocio central.
+
+### 3. Pruebas de Widgets
+- **Alcance**: Verificar que los widgets se renderizan correctamente, responden a interacciones y actualizan su estado como se espera. No prueban lógica de negocio compleja; solo la UI y su interacción.
+- **Ubicación**: Los archivos de prueba de widgets deben ubicarse en el directorio `test/widget` y seguir la convención `nombre_del_widget_test.dart`.
+- **Framework**: Utilizar `package:flutter_test/flutter_test`.
+- **Renderización**: Usar `tester.pumpWidget()` para renderizar widgets y `find` para localizar elementos de UI.
+- **Interacciones**: Simular toques (`tester.tap()`), entrada de texto (`tester.enterText()`) y otras interacciones de usuario.
+
+### 4. Pruebas de Integración
+- **Alcance**: Probar flujos de usuario completos o la interacción entre múltiples partes de la aplicación, incluyendo (opcionalmente) la comunicación con servicios simulados o reales.
+- **Ubicación**: Los archivos de prueba de integración deben ubicarse en el directorio `test/integration` y seguir la convención `flujo_de_usuario_integration_test.dart`.
+- **Framework**: Utilizar `package:integration_test/integration_test` (requiere configuración adicional).
+- **Entorno**: Ejecutar en emuladores o dispositivos reales.
+
+### 5. Análisis Estático y Linters
+- **`analysis_options.yaml`**: Mantener y adherirse estrictamente a las reglas de análisis estático definidas en `analysis_options.yaml`.
+- **Advertencias del Linter**: El código de producción **DEBE** estar libre de advertencias del linter. Resolver todas las advertencias para asegurar la consistencia del código, la legibilidad y evitar posibles errores.
+- **Formateo**: Utilizar `dart format` para mantener un estilo de código consistente.
+
+## Code Examples
+
+```dart
+// Good: Ejemplo de prueba unitaria para un Provider (test/unit/auth_provider_test.dart)
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/mockito.dart';
+import 'package:facturamovilapp/providers/auth_provider.dart';
+import 'package:facturamovilapp/services/api_service.dart'; // Mockear esta dependencia
+
+// Mocks generados por build_runner (si se usa mockito_generator)
+class MockApiService extends Mock implements ApiService {}
+
+void main() {
+  group('AuthProvider', () {
+    MockApiService mockApiService;
+    AuthProvider authProvider;
+
+    setUp(() {
+      mockApiService = MockApiService();
+      authProvider = AuthProvider(apiService: mockApiService);
+    });
+
+    test('should log in a user successfully', () async {
+      when(mockApiService.login('test', 'password'))
+          .thenAnswer((_) async => true);
+
+      await authProvider.login('test', 'password');
+
+      expect(authProvider.isLoggedIn, true);
+      verify(mockApiService.login('test', 'password')).called(1);
+    });
+
+    test('should fail login if credentials are incorrect', () async {
+      when(mockApiService.login('wrong', 'password'))
+          .thenAnswer((_) async => false);
+
+      await authProvider.login('wrong', 'password');
+
+      expect(authProvider.isLoggedIn, false);
+      verify(mockApiService.login('wrong', 'password')).called(1);
+    });
+  });
+}
+
+// Good: Ejemplo de prueba de Widget (test/widget/home_screen_test.dart)
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:facturamovilapp/screens/home_screen.dart';
+import 'package:facturamovilapp/providers/auth_provider.dart';
+import 'package:facturamovilapp/services/api_service.dart'; // Para mockear
+
+void main() {
+  group('HomeScreen Widget Test', () {
+    testWidgets('HomeScreen displays welcome message', (WidgetTester tester) async {
+      // Mockear el AuthProvider para aislar la prueba del widget
+      final mockAuthProvider = AuthProvider(apiService: MockApiService());
+      when(mockAuthProvider.currentUser).thenReturn(User(name: 'TestUser'));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChangeNotifierProvider<AuthProvider>.value(
+            value: mockAuthProvider,
+            child: HomeScreen(),
+          ),
+        ),
+      );
+
+      expect(find.text('Bienvenido, TestUser!'), findsOneWidget);
+    });
+  });
+}
+
+// Good: Configuración de analysis_options.yaml
+// # archivo analysis_options.yaml en la raíz del proyecto
+// include: package:flutter_lints/flutter.yaml
+//
+// analyzer:
+//   exclude:
+//     - '**/*.g.dart' # Ignorar archivos generados
+//     - '**/*.freezed.dart'
+//
+// linter:
+//   rules:
+//     - avoid_print
+//     - prefer_single_quotes
+//     - avoid_function_literals_in_foreach_calls
+//     # ... otras reglas personalizadas
+```
+
+## Avoid
+- Escribir pruebas unitarias que dependan de factores externos (red, base de datos) sin mocking.
+- Pruebas de widgets que contengan lógica de negocio compleja o dependencias no mockeadas.
+- Saltarse las pruebas de cualquier capa importante de la aplicación.
+- Ignorar las advertencias del linter o las reglas de `analysis_options.yaml`.
+- No mantener actualizado el archivo `analysis_options.yaml`.
+
+## Integration Notes
+Esta regla es crucial para mantener la calidad y la estabilidad del frontend de Flutter a lo largo del tiempo. Se integra con las guías de arquitectura (`201-arquitectura-frontend-flutter.mdc`), gestión de estado (`205-gestion-estado-provider.mdc`) y capa de servicios (`230-capa-servicios-http.mdc`).

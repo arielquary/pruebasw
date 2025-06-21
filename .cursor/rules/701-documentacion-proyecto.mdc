@@ -1,0 +1,53 @@
+---
+title: "Documentación de Proyecto y Especificaciones Técnicas"
+description: "Establece las directrices y el flujo de trabajo para la creación y mantenimiento de la documentación del proyecto, utilizando las plantillas estandarizadas."
+patterns:
+  - "**/*.md"
+---
+
+# 701: Documentación de Proyecto y Especificaciones Técnicas
+
+## 1. Resumen
+
+Esta regla define el flujo de trabajo y los estándares para la creación y el mantenimiento de toda la documentación técnica y de producto dentro del proyecto **facturamovilapp**. El objetivo es asegurar que la documentación sea consistente, clara, completa y que sirva como una fuente de verdad única para el equipo de desarrollo.
+
+El uso de las plantillas estandarizadas ubicadas en `.raise/templates/` es **obligatorio**.
+
+## 2. Flujo de Trabajo de Documentación
+
+La documentación del proyecto sigue un flujo jerárquico que va desde la visión de alto nivel hasta las especificaciones detalladas de implementación y los artefactos del backlog.
+
+### Fase 1: Visión y Requisitos (Solution)
+
+Todo proyecto o iniciativa mayor comienza con la definición de la visión y los requisitos.
+
+- **Visión de la Solución**: Utiliza la plantilla `.raise/templates/solution/solution-vision-template.md` para describir el propósito, los objetivos y el alcance de alto nivel de la solución.
+- **Requisitos del Proyecto**: Detalla los requisitos funcionales y no funcionales utilizando la plantilla `.raise/templates/solution/project_requirements.md`.
+- **Priorización y Roadmap**: Define la priorización de funcionalidades y el roadmap inicial con las plantillas `.raise/templates/solution/feature-prioritization-template.md` y `.raise/templates/solution/estimation_roadmap.md`.
+
+### Fase 2: Diseño Técnico (Design)
+
+Una vez que los requisitos están claros, se procede al diseño técnico.
+
+- **Diseño Técnico General**: Para cada iniciativa mayor, se debe crear un documento de diseño técnico general usando la plantilla `.raise/templates/design/tech_design.md`. Este documento describe la arquitectura general, las decisiones clave y el impacto en los sistemas existentes.
+- **Diseños Específicos**:
+    - **APIs**: Para nuevas APIs o modificaciones significativas, utiliza `.raise/templates/design/api_spec.md`.
+    - **Componentes**: Para componentes reutilizables o complejos, tanto en backend como en frontend, usa `.raise/templates/design/component_spec.md`.
+    - **Frontend**: Para diseños específicos de la arquitectura o flujos complejos en la aplicación Flutter, usa `.raise/templates/design/frontend_tech_design.md`.
+
+### Fase 3: Gestión del Backlog (Backlog)
+
+La documentación de diseño se desglosa en artefactos accionables para el equipo de desarrollo.
+
+- **Épicas y Capacidades**: Las grandes funcionalidades se documentan como Épicas (`feature_epic.md`) o Capacidades (`capability.md`).
+- **Historias de Usuario**: Cada funcionalidad se descompone en Historias de Usuario (`user_story.md`), que deben estar vinculadas a su épica o capacidad correspondiente.
+- **Bugs**: Los errores se reportan utilizando la plantilla `bug.md`, que debe incluir pasos para reproducir, comportamiento esperado vs. actual y, si es posible, análisis de la causa raíz.
+- **Backlog General**: La vista general del backlog se gestiona a través de `project_backlog.md`.
+
+## 3. Directrices Generales
+
+- **Claridad y Concisión**: La documentación debe ser fácil de entender. Evita la jerga innecesaria y sé directo.
+- **Diagramas**: Utiliza diagramas (en formato Mermaid o PlantUML, integrables en Markdown) para ilustrar arquitecturas, flujos de datos y secuencias complejas.
+- **Trazabilidad**: Asegura que haya una vinculación clara entre los requisitos, los documentos de diseño y los elementos del backlog (ej. issues de Jira).
+- **Mantenimiento**: La documentación es un artefacto vivo. Debe ser actualizada cada vez que se realicen cambios significativos en el código o la arquitectura que la invaliden.
+- **Ubicación**: Toda la documentación técnica y de diseño debe residir dentro del directorio `.raise/` en la estructura de carpetas correspondiente (`solution`, `design`, `backlog`).

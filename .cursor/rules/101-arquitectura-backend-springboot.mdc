@@ -1,0 +1,87 @@
+---
+title: "Arquitectura de Backend con Spring Boot"
+description: "Directrices para la implementación de controladores REST en el backend, asegurando el uso de DTOs, códigos de estado HTTP semánticos y una clara separación de responsabilidades."
+patterns:
+  - "**/*.java"
+---
+
+# Arquitectura de Backend con Spring Boot
+
+## Contexto
+El backend de `factura-movil` está construido sobre una arquitectura de microservicios robusta, utilizando Spring Boot y Spring Cloud. Cada microservicio sigue una estructura de capas interna consistente.
+
+## Core Guidelines
+
+### 1. Estructura General de Microservicios
+- **Spring Boot**: Todos los microservicios deben ser aplicaciones Spring Boot.
+- **Spring Cloud**: Utilización de componentes de Spring Cloud para la orquestación de microservicios.
+
+### 2. Service Discovery (Spring Cloud Eureka)
+- **Registro**: Cada microservicio debe registrarse con `944-EurekaFacMovil` al iniciar.
+- **Descubrimiento**: Los microservicios deben consultar a Eureka para obtener la ubicación de otros servicios con los que necesiten comunicarse.
+
+### 3. Estructura Interna de Capas (Paquetes `com.sat.facmovil`)
+Cada microservicio debe adherirse a la siguiente estructura de paquetes para la separación de responsabilidades:
+- `configuration` / `config`: Clases de configuración de Spring.
+- `domain`: Entidades de dominio (clases JPA).
+- `repository`: Interfaces Spring Data JPA para el acceso a datos.
+- `service`: Clases de lógica de negocio y orquestación.
+- `web.rest`: Controladores REST que exponen las APIs del servicio.
+- `utils`: Clases de utilidades transversales.
+- `idc` (si aplica): Clases relacionadas con la integración del IdC.
+
+### 4. Comunicación entre Servicios
+- La comunicación entre microservicios de backend debe realizarse de forma **síncrona** a través de llamadas **HTTP cliente (REST)**, facilitada por Eureka.
+
+### 5. Manejo de Tareas Programadas y Concurrencia
+- **ShedLock**: Para asegurar que las tareas programadas o procesos asíncronos complejos se ejecuten de manera exclusiva en un entorno de microservicios, se debe utilizar `ShedLock`.
+- **Habilitación de Tareas**: Si las tareas programadas deben ejecutarse, la anotación `@EnableScheduling` debe estar explícitamente habilitada en la configuración correspondiente (e.g., `ShedLockConfig.java`, `EnvioNotificaciones.java`).
+
+## Code Examples
+
+```java
+// Ejemplo de configuración de un microservicio Spring Boot con Eureka Client
+// En application.yml
+// spring:
+//   application:
+//     name: my-microservice-name
+// eureka:
+//   client:
+//     serviceUrl:
+//       defaultZone: http://944-EurekaFacMovil:8761/eureka/
+
+// Ejemplo de estructura de capas
+package com.sat.facmovil.myservice;
+
+import com.sat.facmovil.myservice.configuration.MyConfig;
+import com.sat.facmovil.myservice.domain.MyEntity;
+import com.sat.facmovil.myservice.repository.MyEntityRepository;
+import com.sat.facmovil.myservice.service.MyBusinessService;
+import com.sat.facmovil.myservice.web.rest.MyResource;
+
+// ... other imports for utils, idc, etc.
+
+// Ejemplo de una clase de servicio básica
+@Service
+public class MyBusinessService {
+    private final MyEntityRepository myEntityRepository;
+
+    public MyBusinessService(MyEntityRepository myEntityRepository) {
+        this.myEntityRepository = myEntityRepository;
+    }
+
+    public MyEntity createEntity(MyEntity entity) {
+        // Business logic here
+        return myEntityRepository.save(entity);
+    }
+}
+```
+
+## Avoid
+- Microservicios sin una estructura de capas interna clara y consistente.
+- Comunicación directa entre servicios sin pasar por el mecanismo de Service Discovery.
+- Duplicación de tareas programadas en múltiples instancias del mismo servicio sin un mecanismo de bloqueo como ShedLock.
+- Dejar `@EnableScheduling` comentado si las tareas programadas deben estar activas.
+
+## Integration Notes
+Esta regla establece la base arquitectónica para todos los microservicios Java en el backend de `factura-movil`, asegurando modularidad y escalabilidad.

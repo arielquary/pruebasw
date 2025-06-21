@@ -1,0 +1,79 @@
+---
+title: "Manejo de Excepciones en Backend"
+description: "Directrices para el manejo adecuado de excepciones en el backend de Java, asegurando la estabilidad, depuración y experiencia de usuario del sistema."
+patterns:
+  - "**/*.java"
+---
+
+# Manejo de Excepciones en Backend
+
+## Contexto
+El manejo adecuado de excepciones es crucial para la estabilidad, depuración y experiencia de usuario del sistema `factura-movil`. Esta regla busca estandarizar cómo se gestionan los errores en la capa de backend de Java.
+
+## Core Guidelines
+
+### 1. Captura de Excepciones Específicas
+- **Capturar excepciones específicas**: Se deben capturar excepciones tan específicas como sea posible en lugar de excepciones genéricas (`java.lang.Exception`, `java.lang.Throwable`).
+- **Propósito**: Esto facilita la depuración, permite un manejo de errores más preciso y evita ocultar problemas inesperados.
+
+### 2. Creación de Excepciones Personalizadas
+- **Excepciones de Negocio**: Crear excepciones personalizadas para errores de negocio o condiciones inesperadas específicas del dominio de `factura-movil` (e.g., `FacturaNotFoundException`, `InvalidCfdiDataException`).
+- **Ubicación**: Estas excepciones personalizadas deben ubicarse en un paquete dedicado, como `com.sat.facmovil.<modulo>.exception`.
+
+### 3. Manejo de Errores en Capas Superiores (REST/API Gateway)
+- **Transformación a Respuestas HTTP**: Las excepciones deben ser capturadas en la capa REST (`*Resource.java`) o en el API Gateway (`944-ZuulFacMovil`) y transformadas en respuestas HTTP consistentes y significativas para el cliente.
+- **Códigos de Estado HTTP**: Utilizar códigos de estado HTTP apropiados (e.g., `4xx` para errores de cliente como validación o recursos no encontrados, `5xx` para errores de servidor inesperados).
+- **Formato de Respuesta**: Las respuestas de error deben seguir un formato estandarizado (e.g., JSON con campos para `code`, `message`, `details`).
+- **Centralización**: Se recomienda implementar una estrategia de manejo de excepciones global (e.g., Spring `@ControllerAdvice`) para asegurar la consistencia en todos los controladores.
+
+### 4. Logging
+- Todas las excepciones (tanto controladas como no controladas) deben ser loggeadas con suficiente contexto (clase, método, parámetros relevantes, stack trace completo) utilizando el sistema de logging estándar del proyecto.
+
+## Code Examples
+
+```java
+// Good: Captura de excepción específica
+try {
+    // Some operation that might throw a specific exception
+    someService.performAction();
+} catch (IOException e) {
+    // Handle specific IO exception
+    log.error("Error de I/O al realizar la acción: {}", e.getMessage(), e);
+    throw new CustomBusinessException("Error al procesar el archivo", e);
+} catch (AnotherSpecificException e) {
+    // Handle another specific exception
+    log.warn("Advertencia de otra excepción: {}", e.getMessage());
+    // ... more specific handling
+}
+
+// Bad: Captura de excepción genérica que oculta el problema real
+try {
+    // Some operation
+    anotherService.doSomething();
+} catch (Exception e) { // <-- AVOID THIS
+    log.error("Ocurrió un error: {}", e.getMessage(), e);
+    // Esto oculta la causa raíz y dificulta la depuración
+}
+
+// Ejemplo de una excepción personalizada (FacturaNotFoundException.java)
+package com.sat.facmovil.facturamovil.exception;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
+
+@ResponseStatus(HttpStatus.NOT_FOUND) // Mapea a 404 HTTP directamente si se usa en un controlador
+public class FacturaNotFoundException extends RuntimeException {
+    public FacturaNotFoundException(String message) {
+        super(message);
+    }
+}
+```
+
+## Avoid
+- Bloques `catch (Exception)` sin un manejo de error específico y justificado.
+- Ocultar o ignorar excepciones sin loggearlas o relanzarlas adecuadamente.
+- Devolver mensajes de error genéricos al cliente que no proporcionan contexto.
+- Lógica de manejo de errores inconsistente entre diferentes controladores o servicios.
+
+## Integration Notes
+Esta regla es transversal a todas las capas del backend Java y se complementa con las reglas de `110-desarrollo-rest-controllers.mdc` para el manejo de respuestas HTTP y `120-capa-de-servicio.mdc` para la lógica de negocio.

@@ -1,0 +1,92 @@
+---
+title: "Comunicación con Backend HTTP (Flutter)"
+description: "La aplicación móvil factura-movil se comunica con el backend a través del API Gateway (944-ZuulFacMovil). Esta regla establece las mejores prácticas para realizar solicitudes HTTP/S desde el frontend, asegurando una comunicación segura y estructurada."
+patterns:
+  - "**/*.dart"
+---
+
+# Comunicación con Backend HTTP (Flutter)
+
+## Contexto
+La aplicación móvil `factura-movil` se comunica con el backend a través del API Gateway (`944-ZuulFacMovil`). Esta regla establece las mejores prácticas para realizar solicitudes HTTP/S desde el frontend, asegurando una comunicación segura y estructurada.
+
+## Core Guidelines
+
+### 1. Centralización de la Lógica de Comunicación en Servicios
+- Las clases que encapsulan la lógica de comunicación con el backend y servicios de terceros deben ubicarse en el directorio `lib/services` y usar el sufijo `*service.dart` (e.g., `authentication_service.dart`, `factura_api_service.dart`).
+- Cada servicio debe ser responsable de interactuar con un conjunto específico de endpoints o recursos del backend.
+
+### 2. Uso del Interceptor de Autenticación
+- La clase `auth_interceptor.dart` juega un papel crucial al interceptar las solicitudes HTTP salientes para inyectar automáticamente el JSON Web Token (JWT) en las cabeceras de autorización.
+- **Obligatorio**: Todas las solicitudes a endpoints protegidos del backend deben pasar por este interceptor para asegurar que estén autenticadas.
+
+### 3. Manejo de Autenticación (Flujo)
+- La aplicación móvil envía credenciales al API Gateway.
+- El API Gateway valida las credenciales y genera un JWT.
+- El JWT es devuelto a la aplicación móvil y debe ser almacenado de forma segura (e.g., usando `flutter_secure_storage`).
+- Para solicitudes posteriores, el JWT se incluye en las cabeceras HTTP (gestionado por `auth_interceptor.dart`).
+
+### 4. Manejo de Errores HTTP
+- Los servicios deben implementar un manejo robusto de errores para las respuestas HTTP, incluyendo la interpretación de códigos de estado (4xx, 5xx) y el manejo de excepciones de red.
+- Las utilidades para el manejo de errores HTTP pueden centralizarse en `lib/helpers/utileria_http.dart` o similar.
+
+## Code Examples
+
+```dart
+// Good: Servicio de ejemplo (lib/services/user_service.dart)
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../models/user_model.dart'; // Suponiendo un modelo para User
+
+class UserService {
+  final String baseUrl = 'https://api.facturamovil.com/api'; // URL base del API Gateway
+
+  // Este método asume que el interceptor ya añade el token
+  Future<UserModel> fetchUserData(String userId) async {
+    final response = await http.get(Uri.parse('$baseUrl/users/$userId'));
+
+    if (response.statusCode == 200) {
+      return UserModel.fromJson(json.decode(response.body));
+    } else if (response.statusCode == 404) {
+      throw Exception('Usuario no encontrado');
+    } else {
+      throw Exception('Fallo al cargar datos del usuario: ${response.statusCode}');
+    }
+  }
+
+  // ... otros métodos para interactuar con la API de usuarios
+}
+
+// Good: auth_interceptor.dart (ejemplo simplificado)
+// lib/interceptors/auth_interceptor.dart
+import 'package:http_interceptor/http_interceptor.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // O flutter_secure_storage
+
+class AuthInterceptor implements Interceptor {
+  @override
+  Future<RequestData> interceptRequest({required RequestData data}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt_token');
+    if (token != null) {
+      data.headers['Authorization'] = 'Bearer $token';
+    }
+    return data;
+  }
+
+  @override
+  Future<ResponseData> interceptResponse({required ResponseData data}) async => data;
+}
+
+// Integración con un cliente HTTP (ejemplo con http_interceptor)
+// final client = InterceptedClient.build(interceptors: [AuthInterceptor()]);
+// final response = await client.get(Uri.parse('...'));
+```
+
+## Avoid
+- Realizar solicitudes HTTP directamente en los widgets o providers; siempre delegar a los servicios (`lib/services`).
+- Hardcodear tokens de autenticación o credenciales en el código.
+- Ignorar los códigos de estado HTTP o no implementar un manejo de errores robusto.
+- Duplicar la lógica de adición de encabezados de autorización en cada solicitud.
+
+## Integration Notes
+Esta regla es crucial para la seguridad y la organización de la comunicación en el frontend de Flutter, complementando la estructura arquitectónica (`201-arquitectura-frontend-flutter.mdc`) y el manejo de estado (`205-gestion-estado-provider.mdc`).

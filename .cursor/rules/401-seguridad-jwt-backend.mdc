@@ -1,0 +1,98 @@
+---
+title: "Seguridad JWT en Backend"
+description: "Directrices para la implementación y gestión de la seguridad basada en JWT en el backend."
+patterns:
+  - "**/*.java"
+---
+
+# Seguridad JWT en Backend
+
+## Contexto
+La seguridad en `factura-movil` es una preocupación transversal, principalmente implementada a través del API Gateway (`944-ZuulFacMovil`) y reforzada por el uso de JWTs para la autenticación y autorización de usuarios.
+
+## Core Guidelines
+
+### 1. Flujo de Autenticación Centralizado
+- El proceso de autenticación sigue un flujo centralizado a través del API Gateway (`944-ZuulFacMovil`).
+- Las credenciales del usuario son validadas con el Sistema de Identidades Centralizado (IdC) vía SOAP (`IdcInternoClientService.java`, `SoapConfiguration.java`).
+- Tras la validación exitosa, el API Gateway genera un JSON Web Token (JWT).
+- El JWT se devuelve a la aplicación móvil para su almacenamiento seguro y uso en solicitudes posteriores.
+
+### 2. Generación y Validación de JWT
+- **Generación**: El `JwtTokenProvider.java` es el encargado de generar el JWT, incluyendo la información del usuario y sus roles.
+- **Validación**: El `JWTFilter.java` intercepta todas las solicitudes en el API Gateway para validar la autenticidad y vigencia del JWT en la cabecera `Authorization`.
+- **Configuración de Seguridad**: La `SecurityConfiguration.java` es fundamental para definir las reglas de seguridad de Spring Security, mapeando rutas a roles y configurando el filtro JWT.
+
+### 3. Autorización Basada en Roles
+- **Roles Definidos**: Los roles de seguridad están centralizados en la clase `AuthoritiesConstants.java` dentro del módulo `944-ZuulFacMovil` (e.g., `ROLE_ADMIN`, `ROLE_USER`, `ROLE_ANONYMOUS`).
+- **Mecanismo de Protección**: El control de acceso a los recursos se gestiona a través de la configuración de Spring Security en el API Gateway. Se deben definir las rutas que requieren autenticación y los roles necesarios para acceder a ellas.
+
+### 4. Manejo Seguro de Credenciales y Tokens
+- **No Hardcodear Secretos**: Las claves secretas para la firma de JWT y otras credenciales sensibles **NO** deben ser hardcodeadas en el código fuente.
+- **Externalización de Configuración**: Utilizar `application.yml` o `application.properties` para externalizar configuraciones. Para producción, se recomienda usar variables de entorno o sistemas de gestión de secretos (e.g., Kubernetes Secrets).
+- **Comunicación HTTPS**: Todas las comunicaciones que involucren JWT o credenciales deben realizarse a través de HTTPS para asegurar el cifrado de datos en tránsito.
+
+## Code Examples
+
+```java
+// Ejemplo simplificado de JwtTokenProvider (JwtTokenProvider.java)
+package com.sat.facmovil.zuul.security.jwt;
+
+import io.jsonwebtoken.*;
+import org.springframework.security.core.Authentication;
+// ... otros imports
+
+public class JwtTokenProvider {
+
+    private final String secretKey;
+    private final long validityInMilliseconds;
+
+    public JwtTokenProvider(String secretKey, long validityInMilliseconds) {
+        this.secretKey = secretKey;
+        this.validityInMilliseconds = validityInMilliseconds;
+    }
+
+    public String createToken(Authentication authentication) {
+        // ... lógica para crear el token con roles
+        return Jwts.builder()
+            .setSubject(authentication.getName())
+            .claim("auth", "ROLE_USER") // Ejemplo: añadir roles
+            .setIssuedAt(new Date())
+            .setExpiration(new Date(new Date().getTime() + validityInMilliseconds))
+            .signWith(SignatureAlgorithm.HS512, secretKey)
+            .compact();
+    }
+
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token);
+            return true;
+        } catch (JwtException | IllegalArgumentException e) {
+            // Log error
+            return false;
+        }
+    }
+
+    // ... métodos para obtener autenticación del token, etc.
+}
+
+// Ejemplo de AuthoritiesConstants (AuthoritiesConstants.java)
+package com.sat.facmovil.zuul.security;
+
+public final class AuthoritiesConstants {
+    public static final String ADMIN = "ROLE_ADMIN";
+    public static final String USER = "ROLE_USER";
+    public static final String ANONYMOUS = "ROLE_ANONYMOUS";
+
+    private AuthoritiesConstants() {}
+}
+```
+
+## Avoid
+- Exponer secretos JWT en el código fuente o en archivos de configuración versionados.
+- Deshabilitar filtros de seguridad o la validación de JWT.
+- Implementar lógica de autenticación/autorización redundante en cada microservicio.
+- Usar HTTP en lugar de HTTPS para la comunicación que involucre JWTs.
+
+## Integration Notes
+Esta regla es el pilar de la seguridad del backend y se complementa con `105-patron-api-gateway-zuul.mdc` para la configuración del API Gateway y `410-integracion-idc-soap.mdc` para el flujo de autenticación con el sistema IdC.

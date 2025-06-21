@@ -1,0 +1,90 @@
+---
+title: "Tareas Programadas y Concurrencia (ShedLock)"
+description: "Gestión de la ejecución de tareas programadas en un entorno distribuido con ShedLock."
+patterns:
+  - "**/*.java"
+---
+
+# Tareas Programadas y Concurrencia (ShedLock)
+
+## Contexto
+El módulo `944-Factura_Movil_Backend` utiliza `ShedLock` para gestionar la ejecución de tareas programadas en un entorno distribuido. Esto es crucial para asegurar que una tarea se ejecute una sola vez, incluso si hay múltiples instancias del microservicio desplegadas, previniendo duplicidades o conflictos en operaciones críticas.
+
+## Core Guidelines
+
+### 1. Propósito de ShedLock
+- **Asegurar Ejecución Única**: `ShedLock` debe utilizarse para garantizar que las tareas programadas (e.g., procesamiento de lotes, limpieza de datos, sincronizaciones) se ejecuten una sola vez a través de todas las instancias del microservicio.
+- **Prevención de Conflictos**: Evita que múltiples instancias de la aplicación intenten ejecutar la misma tarea concurrencia, lo que podría llevar a corrupción de datos o ineficiencias.
+
+### 2. Configuración de ShedLock
+- La configuración de `ShedLock` debe centralizarse en una clase específica, como `ShedLockConfig.java`.
+- La configuración debe definir el mecanismo de bloqueo (e.g., base de datos, Redis) y la duración del bloqueo.
+- Asegurarse de que la base de datos (PostgreSQL) se configure adecuadamente para soportar `ShedLock` (creación de la tabla `shedlock`).
+
+### 3. Implementación de Tareas Programadas
+- Utilizar la anotación `@SchedulerLock` en los métodos de las tareas programadas para habilitar el bloqueo distribuido.
+- Especificar un nombre único para cada tarea bloqueada (`name`) y el tiempo de bloqueo (`lockAtMostFor`, `lockAtLeastFor`).
+- Las tareas programadas deben ubicarse en paquetes designados (e.g., `com.sat.facmovil.<modulo>.scheduler`).
+
+### 4. Robustez y Manejo de Fallos
+- Las tareas programadas deben ser idempotentes en la medida de lo posible, para que su reejecución en caso de fallo no cause problemas.
+- Implementar manejo de excepciones y logging adecuado dentro de las tareas programadas.
+
+## Code Examples
+
+```java
+// Good: Ejemplo de ShedLockConfig (ShedLockConfig.java)
+package com.sat.facmovil.facturamovil.config;
+
+import net.javacrumbs.shedlock.core.LockProvider;
+import net.javacrumbs.shedlock.provider.jdbctemplate.JdbcTemplateLockProvider;
+import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+import javax.sql.DataSource;
+
+@Configuration
+@EnableSchedulerLock(defaultLockAtMostFor = "PT30S") // Default max lock time
+public class ShedLockConfig {
+
+    @Bean
+    public LockProvider lockProvider(DataSource dataSource) {
+        return new JdbcTemplateLockProvider(
+            JdbcTemplateLockProvider.Configuration.builder()
+                .withJdbcTemplate(new JdbcTemplate(dataSource))
+                .using // Usa la tabla por defecto: shedlock
+                .build()
+        );
+    }
+}
+
+// Good: Ejemplo de Tarea Programada con ShedLock (MyScheduledTask.java)
+package com.sat.facmovil.facturamovil.scheduler;
+
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+@Component
+public class MyScheduledTask {
+
+    @Scheduled(cron = "0 0 1 * * ?") // Se ejecuta todos los días a la 1 AM
+    @SchedulerLock(name = "my_daily_task", lockAtLeastFor = "PT5M", lockAtMostFor = "PT15M")
+    public void executeDailyTask() {
+        // Lógica de la tarea que debe ejecutarse una única vez
+        System.out.println("Ejecutando tarea diaria de forma segura...");
+        // ...
+    }
+}
+```
+
+## Avoid
+- Implementar tareas programadas sin un mecanismo de bloqueo distribuido en entornos con múltiples instancias.
+- No configurar `ShedLock` correctamente, lo que puede llevar a ejecuciones duplicadas.
+- Olvidar la tabla `shedlock` en la base de datos para el proveedor JDBC.
+- No definir tiempos de bloqueo (`lockAtMostFor`, `lockAtLeastFor`) adecuados, lo que podría bloquear tareas indefinidamente o liberarlas demasiado pronto.
+
+## Integration Notes
+Esta regla es vital para la operación correcta y segura de tareas programadas en un entorno de microservicios distribuido, especialmente en el backend de `factura-movil`. Se relaciona con las guías de despliegue y base de datos.

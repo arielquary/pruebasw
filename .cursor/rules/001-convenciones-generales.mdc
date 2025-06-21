@@ -1,0 +1,77 @@
+---
+title: "Convenciones y Buenas Prácticas Generales"
+description: "Establece las convenciones de codificación y las buenas prácticas que deben seguirse en el proyecto factura-movil para asegurar la consistencia, legibilidad, mantenibilidad y calidad del código, aplicables a Java y Dart."
+patterns:
+  - "**/*.java"
+  - "**/*.dart"
+---
+
+# Convenciones y Buenas Prácticas Generales
+
+## Contexto
+Este documento establece las convenciones de codificación y las buenas prácticas que deben seguirse en el proyecto `factura-movil` para asegurar la consistencia, legibilidad, mantenibilidad y calidad del código, aplicables a Java y Dart.
+
+## Core Guidelines
+
+### 1. Convenciones de Nomenclatura
+- **Nombres de Archivo**:
+    - **Dart**: `snake_case` (e.g., `my_file.dart`)
+    - **Java**: `PascalCase` para archivos que contienen clases (e.g., `MyClass.java`)
+- **Constantes**: `UPPER_SNAKE_CASE` (e.g., `MY_CONSTANT`)
+- **Clases e Interfaces (Java/Dart)**: `PascalCase` (e.g., `MyClass`, `MyInterface`)
+- **Métodos y Variables (Java/Dart)**: `camelCase` (e.g., `myMethod()`, `myVariable`)
+- **Paquetes (Java)**: `com.sat.facmovil.<modulo>.<capa>` (e.g., `com.sat.facmovil.service.dto`)
+- **Sufijos de Clases (Java - Patrones Comunes)**:
+    - `*Application.java`, `*Configuration.java`, `*Resource.java`, `*Service.java`, `*Repository.java`, `*DTO.java`, `*Filter.java`, `*Provider.java`, `*Constants.java`, `*Enum.java`
+- **Sufijos de Clases (Dart - Patrones Comunes)**:
+    - `*_screen.dart`, `*_widget.dart`, `*_provider.dart`, `*_model.dart`, `*_service.dart`, `*_enum.dart`, `*_utileria.dart` / `*_helpers.dart`
+
+### 2. Principios de Diseño
+- **SOLID**: Adherencia a los principios de Diseño Orientado a Objetos (Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion) para promover un código modular, flexible y fácil de mantener.
+- **DRY (Don't Repeat Yourself)**: Evitar la duplicación de código. Reutilizar componentes, lógicas y datos siempre que sea posible a través de abstracciones o utilidades compartidas.
+- **Separación de Responsabilidades**: Cada clase, método o módulo debe tener una única responsabilidad bien definida.
+- **Inyección de Dependencias**: Utilizar la inyección de dependencias (Spring en Java, `Provider` en Flutter) para reducir el acoplamiento y facilitar las pruebas unitarias.
+
+### 3. Calidad de Código
+- **Comentarios y Documentación**: Escribir comentarios claros y concisos para explicar el *porqué* de las decisiones complejas o la lógica no obvia. Utilizar JavaDoc para Java y DartDoc para Dart para documentar clases públicas, interfaces, métodos y atributos.
+- **Complejidad Ciclomática**: Mantener la complejidad ciclomática de los métodos y funciones tan baja como sea posible. Métodos complejos deben ser refactorizados en unidades más pequeñas y manejables.
+- **Revisión de Código (Code Review)**: Fomentar un proceso de revisión de código riguroso.
+- **Herramientas de Análisis Estático**: Se recomienda integrar herramientas de análisis estático (ej. SonarQube, linters de Dart) en el pipeline de CI/CD.
+
+## Code Examples
+
+```java
+// Good: Class Name PascalCase
+public class MyService {
+    // Good: Method Name camelCase
+    public void processData() {
+        // Good: Variable Name camelCase
+        String myVariable = "hello";
+        // Good: Constant UPPER_SNAKE_CASE
+        final String MY_CONSTANT = "WORLD";
+    }
+}
+```
+
+```dart
+// Good: File Name snake_case.dart
+// Good: Class Name PascalCase
+class MyScreenWidget {
+  // Good: Method Name camelCase
+  void fetchData() {
+    // Good: Variable Name camelCase
+    String myVariable = "hello";
+    // Good: Constant UPPER_SNAKE_CASE
+    const String MY_CONSTANT = "WORLD";
+  }
+}
+```
+
+## Avoid
+- Nomenclatura inconsistente o no estándar.
+- Duplicación de código.
+- Métodos o clases con múltiples responsabilidades.
+- Falta de documentación para lógica compleja o pública.
+
+## Integration Notes
+Esta regla sienta las bases para todas las demás reglas de codificación en el proyecto, tanto para el backend Java como para el frontend Flutter/Dart.
